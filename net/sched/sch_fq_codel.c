@@ -242,7 +242,6 @@ static struct sk_buff *fq_codel_dequeue(struct Qdisc *sch)
 	struct fq_codel_flow *flow;
 	struct list_head *head;
 	u32 prev_drop_count, prev_ecn_mark;
-	unsigned int prev_backlog;
 
 begin:
 	head = &q->new_flows;
@@ -261,7 +260,6 @@ begin:
 
 	prev_drop_count = q->cstats.drop_count;
 	prev_ecn_mark = q->cstats.ecn_mark;
-	prev_backlog = sch->qstats.backlog;
 
 	skb = codel_dequeue(sch, &q->cparams, &flow->cvars, &q->cstats,
 			    dequeue);
@@ -527,8 +525,6 @@ static unsigned long fq_codel_get(struct Qdisc *sch, u32 classid)
 static unsigned long fq_codel_bind(struct Qdisc *sch, unsigned long parent,
 			      u32 classid)
 {
-	/* we cannot bypass queue discipline anymore */
-	sch->flags &= ~TCQ_F_CAN_BYPASS;
 	return 0;
 }
 
