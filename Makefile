@@ -682,7 +682,7 @@ KBUILD_CFLAGS   += -mcpu=cortex-a53 -mtune=cortex-a53
 endif
 
 ifeq ($(cc-name),gcc)
-KBUILD_CFLAGS   += -mcpu=cortex-a73.cortex-a53 -mtune=cortex-a73.cortex-a53
+KBUILD_CFLAGS   += -mcpu=cortex-a53 -mtune=cortex-a53
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
