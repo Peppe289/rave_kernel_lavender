@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.4.206 Kernel Configuration
+# Linux/arm64 4.4.211 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -1964,6 +1964,7 @@ CONFIG_TOUCHSCREEN_NVT_F7A=y
 # CONFIG_TOUCHSCREEN_FT5X06 is not set
 # CONFIG_TOUCHSCREEN_IT7260_I2C is not set
 # CONFIG_TOUCHSCREEN_ST is not set
+CONFIG_TOUCHSCREEN_COMMON=y
 CONFIG_INPUT_MISC=y
 # CONFIG_INPUT_AD714X is not set
 # CONFIG_INPUT_BMA150 is not set
@@ -3444,6 +3445,7 @@ CONFIG_HID_PLANTRONICS=y
 # CONFIG_HID_SAMSUNG is not set
 # CONFIG_HID_SONY is not set
 # CONFIG_HID_SPEEDLINK is not set
+# CONFIG_HID_STEAM is not set
 # CONFIG_HID_STEELSERIES is not set
 # CONFIG_HID_SUNPLUS is not set
 # CONFIG_HID_RMI is not set
