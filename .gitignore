@@ -9,7 +9,7 @@
 #
 # Normal rules
 #
-.*
+.vscode/
 *.o
 *.o.*
 *.a
@@ -124,5 +124,4 @@ Android.bp
 
 # build
 out/
-build.sh
 kernel.log
