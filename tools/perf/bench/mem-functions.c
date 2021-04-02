@@ -206,13 +206,8 @@ static void memcpy_alloc_mem(void **dst, void **src, size_t size)
 	memset(*src, 0, size);
 }
 
-static u64 do_memcpy_cycles(const struct function *r, size_t size)
+static void memcpy_prefault(memcpy_t fn, size_t size, void *src, void *dst)
 {
-	u64 cycle_start = 0ULL, cycle_end = 0ULL;
-	void *src = NULL, *dst = NULL;
-	memcpy_t fn = r->fn.memcpy;
-	int i;
-
 	memcpy_alloc_mem(&dst, &src, size);
 
 	/*
@@ -220,6 +215,15 @@ static u64 do_memcpy_cycles(const struct function *r, size_t size)
 	 * to not measure page fault overhead:
 	 */
 	fn(dst, src, size);
+}
+
+static u64 do_memcpy_cycles(const struct function *r, size_t size, void *src, void *dst)
+{
+	u64 cycle_start = 0ULL, cycle_end = 0ULL;
+	memcpy_t fn = r->fn.memcpy;
+	int i;
+
+	memcpy_prefault(fn, size, src, dst);
 
 	cycle_start = get_cycles();
 	for (i = 0; i < nr_loops; ++i)
@@ -244,7 +248,7 @@ static double do_memcpy_gettimeofday(const struct function *r, size_t size)
 	 * We prefault the freshly allocated memory range here,
 	 * to not measure page fault overhead:
 	 */
-	fn(dst, src, size);
+	memcpy_prefault(dst, src, size);
 
 	BUG_ON(gettimeofday(&tv_start, NULL));
 	for (i = 0; i < nr_loops; ++i)
