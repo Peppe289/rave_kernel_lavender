@@ -54,8 +54,13 @@
 #define DFPS_DATA_MAX_FPS 0x7fffffff
 #define DFPS_DATA_MAX_CLK_RATE 250000
 
-bool custom_hz = false;
-module_param(custom_hz, bool, 0644);
+#define LIMIT_60_HZ		60
+#define LIMIT_55_HZ		55
+#define LIMIT_50_HZ		50
+
+int custom_hz = LIMIT_60_HZ;
+module_param(custom_hz, int, 0644);
+MODULE_PARM_DESC(custom_hz, "Accepted values are: 50, 55, 60, default");
 
 static int mdss_mdp_overlay_free_fb_pipe(struct msm_fb_data_type *mfd);
 static int mdss_mdp_overlay_fb_parse_dt(struct msm_fb_data_type *mfd);
@@ -3511,12 +3516,27 @@ int check_userspace_fps_chose(struct mdss_panel_data *pdata)
 {
 	int ret = pdata->panel_info.max_fps; /* Default */
 
-	if(custom_hz) {
-		ret = 50;
-		return ret; /* return custom fps */
+	if (custom_hz < LIMIT_50_HZ || custom_hz > ret) {
+		if (custom_hz > ret) {
+			custom_hz = ret;
+			return custom_hz; /* return default Hz*/
+		} else {
+			custom_hz = LIMIT_50_HZ;
+			return custom_hz;
+		}
+
+	} else {
+
+		if (custom_hz > LIMIT_60_HZ && custom_hz < ret) {
+			custom_hz = ret;
+		} else if (custom_hz > LIMIT_55_HZ && custom_hz < LIMIT_60_HZ) {
+			custom_hz = LIMIT_60_HZ;
+		} else if (custom_hz > LIMIT_50_HZ && custom_hz < LIMIT_55_HZ) {
+			custom_hz = LIMIT_55_HZ;
+		}
 	}
 
-	return ret;
+	return custom_hz;
 }
 
 int mdss_mdp_dfps_update_params(struct msm_fb_data_type *mfd,
