@@ -3557,8 +3557,8 @@ int mdss_mdp_dfps_update_params(struct msm_fb_data_type *mfd,
 		mutex_unlock(&mdp5_data->dfps_lock);
 		return -EINVAL;
 	} else if (dfps > change_fps) {
-		pr_warn("Unsupported FPS. Configuring to max_fps = %d\n",
-				pdata->panel_info.max_fps);
+		pr_debug("Unsupported FPS. Configuring to max_fps = %d\n",
+				change_fps);
 		dfps = change_fps;
 		dfps_data->fps = dfps;
 	}
