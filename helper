@@ -100,7 +100,7 @@ gen_toolchain(){
 		git clone --depth=1 https://github.com/chips-project/aarch64-elf gcc64
 		git clone --depth=1 https://github.com/chips-project/arm-eabi gcc32
 	fi
-	git clone --depth=1 https://github.com/Peppe289/AnyKernel.git -b AnyKernel  anykernel
+	git clone --depth=1 https://github.com/Peppe289/AnyKernel3.git -b lavender anykernel
 }
 
 build(){
