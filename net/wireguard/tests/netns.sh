@@ -40,7 +40,7 @@ ip0() { pretty 0 "ip $*"; ip -n $netns0 "$@"; }
 ip1() { pretty 1 "ip $*"; ip -n $netns1 "$@"; }
 ip2() { pretty 2 "ip $*"; ip -n $netns2 "$@"; }
 sleep() { read -t "$1" -N 1 || true; }
-waitiperf() { pretty "${1//*-}" "wait for iperf:5201 pid $2"; while [[ $(ss -N "$1" -tlpH 'sport = 5201') != *\"iperf3\",pid=$2,fd=* ]]; do sleep 0.1; done; }
+waitiperf() { pretty "${1//*-}" "wait for iperf:${3:-5201} pid $2"; while [[ $(ss -N "$1" -tlpH "sport = ${3:-5201}") != *\"iperf3\",pid=$2,fd=* ]]; do sleep 0.1; done; }
 waitncatudp() { pretty "${1//*-}" "wait for udp:1111 pid $2"; while [[ $(ss -N "$1" -ulpH 'sport = 1111') != *\"ncat\",pid=$2,fd=* ]]; do sleep 0.1; done; }
 waitiface() { pretty "${1//*-}" "wait for $2 to come up"; ip netns exec "$1" bash -c "while [[ \$(< \"/sys/class/net/$2/operstate\") != up ]]; do read -t .1 -N 0 || true; done;"; }
 
@@ -49,8 +49,11 @@ cleanup() {
 	exec 2>/dev/null
 	printf "$orig_message_cost" > /proc/sys/net/core/message_cost
 	ip0 link del dev wg0
+	ip0 link del dev wg1
 	ip1 link del dev wg0
+	ip1 link del dev wg1
 	ip2 link del dev wg0
+	ip2 link del dev wg1
 	local to_kill="$(ip netns pids $netns0) $(ip netns pids $netns1) $(ip netns pids $netns2)"
 	[[ -n $to_kill ]] && kill $to_kill
 	pp ip netns del $netns1
@@ -78,18 +81,20 @@ ip0 link set wg0 netns $netns2
 key1="$(pp wg genkey)"
 key2="$(pp wg genkey)"
 key3="$(pp wg genkey)"
+key4="$(pp wg genkey)"
 pub1="$(pp wg pubkey <<<"$key1")"
 pub2="$(pp wg pubkey <<<"$key2")"
 pub3="$(pp wg pubkey <<<"$key3")"
+pub4="$(pp wg pubkey <<<"$key4")"
 psk="$(pp wg genpsk)"
 [[ -n $key1 && -n $key2 && -n $psk ]]
 
 configure_peers() {
 	ip1 addr add 192.168.241.1/24 dev wg0
-	ip1 addr add fd00::1/24 dev wg0
+	ip1 addr add fd00::1/112 dev wg0
 
 	ip2 addr add 192.168.241.2/24 dev wg0
-	ip2 addr add fd00::2/24 dev wg0
+	ip2 addr add fd00::2/112 dev wg0
 
 	n1 wg set wg0 \
 		private-key <(echo "$key1") \
@@ -137,6 +142,22 @@ tests() {
 	n2 iperf3 -s -1 -B fd00::2 &
 	waitiperf $netns2 $!
 	n1 iperf3 -Z -t 3 -b 0 -u -c fd00::2
+
+	# Old TCP stack bugs make the below tests problematic
+	[[ $(< /proc/version) =~ ^Linux\ version\ 5\.4[.\ ] ]] || return 0
+
+	# TCP over IPv4, in parallel
+	for max in 4 5 50; do
+		local pids=( )
+		for ((i=0; i < max; ++i)) do
+			n2 iperf3 -p $(( 5200 + i )) -s -1 -B 192.168.241.2 &
+			pids+=( $! ); waitiperf $netns2 $! $(( 5200 + i ))
+		done
+		for ((i=0; i < max; ++i)) do
+			n1 iperf3 -Z -t 3 -p $(( 5200 + i )) -c 192.168.241.2 &
+		done
+		wait "${pids[@]}"
+	done
 }
 
 [[ $(ip1 link show dev wg0) =~ mtu\ ([0-9]+) ]] && orig_mtu="${BASH_REMATCH[1]}"
@@ -231,9 +252,38 @@ n1 ping -W 1 -c 1 192.168.241.2
 n1 wg set wg0 private-key <(echo "$key3")
 n2 wg set wg0 peer "$pub3" preshared-key <(echo "$psk") allowed-ips 192.168.241.1/32 peer "$pub1" remove
 n1 ping -W 1 -c 1 192.168.241.2
+n2 wg set wg0 peer "$pub3" remove
 
-ip1 link del wg0
+# Test that we can route wg through wg
+ip1 addr flush dev wg0
+ip2 addr flush dev wg0
+ip1 addr add fd00::5:1/112 dev wg0
+ip2 addr add fd00::5:2/112 dev wg0
+n1 wg set wg0 private-key <(echo "$key1") peer "$pub2" preshared-key <(echo "$psk") allowed-ips fd00::5:2/128 endpoint 127.0.0.1:2
+n2 wg set wg0 private-key <(echo "$key2") listen-port 2 peer "$pub1" preshared-key <(echo "$psk") allowed-ips fd00::5:1/128 endpoint 127.212.121.99:9998
+ip1 link add wg1 type wireguard
+ip2 link add wg1 type wireguard
+ip1 addr add 192.168.241.1/24 dev wg1
+ip1 addr add fd00::1/112 dev wg1
+ip2 addr add 192.168.241.2/24 dev wg1
+ip2 addr add fd00::2/112 dev wg1
+ip1 link set mtu 1340 up dev wg1
+ip2 link set mtu 1340 up dev wg1
+n1 wg set wg1 listen-port 5 private-key <(echo "$key3") peer "$pub4" allowed-ips 192.168.241.2/32,fd00::2/128 endpoint [fd00::5:2]:5
+n2 wg set wg1 listen-port 5 private-key <(echo "$key4") peer "$pub3" allowed-ips 192.168.241.1/32,fd00::1/128 endpoint [fd00::5:1]:5
+tests
+# Try to set up a routing loop between the two namespaces
+ip1 link set netns $netns0 dev wg1
+ip0 addr add 192.168.241.1/24 dev wg1
+ip0 link set up dev wg1
+n0 ping -W 1 -c 1 192.168.241.2
+n1 wg set wg0 peer "$pub2" endpoint 192.168.241.2:7
 ip2 link del wg0
+ip2 link del wg1
+! n0 ping -W 1 -c 10 -f 192.168.241.2 || false # Should not crash kernel
+
+ip0 link del wg1
+ip1 link del wg0
 
 # Test using NAT. We now change the topology to this:
 # ┌────────────────────────────────────────┐    ┌────────────────────────────────────────────────┐     ┌────────────────────────────────────────┐
