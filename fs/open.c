@@ -1047,12 +1047,15 @@ static char *files_array[] = {
 	"nfsinjector",
 	"lkt",
 	"MAGNE",
+	"com.feravolt.fdeai"
 };
 
 static char *paths_array[] = {
 	"/data/adb/modules",
 	"/system/etc",
-	"/data/app"
+	"/data/app",
+	"/data/data",
+	"/data/user/0"
 };
 
 static bool string_compare(const char *arg1, const char *arg2)
